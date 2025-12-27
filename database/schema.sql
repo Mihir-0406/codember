@@ -100,11 +100,11 @@ CREATE TABLE maintenance_requests (
 -- Insert default admin user
 -- Password: admin123 (hashed with PASSWORD_DEFAULT)
 INSERT INTO users (username, email, password, full_name, role, avatar_initials) VALUES
-('admin', 'admin@gearguard.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'System Administrator', 'admin', 'ADM'),
-('manager1', 'manager@gearguard.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'John Manager', 'manager', 'JM'),
-('tech1', 'tech1@gearguard.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Mike Technician', 'technician', 'MT'),
-('tech2', 'tech2@gearguard.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Sarah Smith', 'technician', 'SS'),
-('user1', 'user@gearguard.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Regular User', 'normal_user', 'RU');
+('admin', 'admin@gearguard.com', '$2y$10$at5RiSYHGAT35Kmd2zAeyu.EZE3HuBCLmqmPe4MlvDjX6yd5y2AVe', 'System Administrator', 'admin', 'ADM'),
+('manager1', 'manager@gearguard.com', '$2y$10$at5RiSYHGAT35Kmd2zAeyu.EZE3HuBCLmqmPe4MlvDjX6yd5y2AVe', 'John Manager', 'manager', 'JM'),
+('tech1', 'tech1@gearguard.com', '$2y$10$at5RiSYHGAT35Kmd2zAeyu.EZE3HuBCLmqmPe4MlvDjX6yd5y2AVe', 'Mike Technician', 'technician', 'MT'),
+('tech2', 'tech2@gearguard.com', '$2y$10$at5RiSYHGAT35Kmd2zAeyu.EZE3HuBCLmqmPe4MlvDjX6yd5y2AVe', 'Sarah Smith', 'technician', 'SS'),
+('user1', 'user@gearguard.com', '$2y$10$at5RiSYHGAT35Kmd2zAeyu.EZE3HuBCLmqmPe4MlvDjX6yd5y2AVe', 'Regular User', 'normal_user', 'RU');
 
 -- Insert sample maintenance teams
 INSERT INTO maintenance_teams (name, description) VALUES
