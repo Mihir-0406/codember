@@ -1,0 +1,271 @@
+// Prisma Schema for GearGuard Maintenance Management System
+// This schema defines the complete data model with all relationships
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// =============================================================================
+// USER MANAGEMENT
+// =============================================================================
+
+// User roles for role-based access control
+enum UserRole {
+  ADMIN      // Full system access
+  MANAGER    // Can manage teams and view all requests
+  TECHNICIAN // Can work on assigned requests
+  REQUESTER  // Can only create and view own requests
+}
+
+// User model - stores all system users with hashed passwords
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  password      String    // Hashed with bcrypt
+  name          String
+  role          UserRole  @default(REQUESTER)
+  avatar        String?   // URL to avatar image
+  department    String?
+  phone         String?
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  teamMemberships    TeamMember[]          // Teams the user belongs to
+  assignedEquipment  Equipment[]           @relation("AssignedEmployee")
+  createdRequests    MaintenanceRequest[]  @relation("RequestCreator")
+  assignedRequests   MaintenanceRequest[]  @relation("AssignedTechnician")
+  requestLogs        RequestLog[]          // Activity logs
+
+  @@index([email])
+  @@index([role])
+  @@map("users")
+}
+
+// =============================================================================
+// MAINTENANCE TEAMS
+// =============================================================================
+
+// Maintenance Team model - groups technicians by specialty
+model MaintenanceTeam {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?  @db.Text
+  color       String   @default("#3b82f6") // For UI display
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  members            TeamMember[]
+  defaultEquipment   Equipment[]           @relation("DefaultTeam")
+  maintenanceRequests MaintenanceRequest[]
+
+  @@map("maintenance_teams")
+}
+
+// Team Member junction table - links users to teams with role
+model TeamMember {
+  id        String   @id @default(cuid())
+  userId    String
+  teamId    String
+  isLeader  Boolean  @default(false) // Team lead has extra permissions
+  joinedAt  DateTime @default(now())
+
+  // Relations
+  user User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  team MaintenanceTeam @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, teamId])
+  @@index([userId])
+  @@index([teamId])
+  @@map("team_members")
+}
+
+// =============================================================================
+// EQUIPMENT MANAGEMENT
+// =============================================================================
+
+// Equipment status
+enum EquipmentStatus {
+  ACTIVE   // Equipment is operational
+  SCRAPPED // Equipment has been scrapped and cannot receive new requests
+}
+
+// Equipment categories
+enum EquipmentCategory {
+  MACHINERY
+  ELECTRICAL
+  PLUMBING
+  HVAC
+  VEHICLES
+  IT_EQUIPMENT
+  SAFETY_EQUIPMENT
+  OFFICE_EQUIPMENT
+  OTHER
+}
+
+// Equipment model - all maintainable assets
+model Equipment {
+  id                String            @id @default(cuid())
+  name              String
+  serialNumber      String            @unique // Unique identifier
+  category          EquipmentCategory
+  department        String
+  description       String?           @db.Text
+  manufacturer      String?
+  model             String?
+  purchaseDate      DateTime
+  warrantyExpiry    DateTime?
+  location          String            // Physical location
+  status            EquipmentStatus   @default(ACTIVE)
+  notes             String?           @db.Text
+  imageUrl          String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  // Optional assigned employee
+  assignedEmployeeId String?
+  assignedEmployee   User?            @relation("AssignedEmployee", fields: [assignedEmployeeId], references: [id], onDelete: SetNull)
+
+  // Default maintenance team for this equipment
+  defaultTeamId      String?
+  defaultTeam        MaintenanceTeam? @relation("DefaultTeam", fields: [defaultTeamId], references: [id], onDelete: SetNull)
+
+  // Default technician for this equipment
+  defaultTechnicianId String?
+
+  // Relations
+  maintenanceRequests MaintenanceRequest[]
+
+  @@index([serialNumber])
+  @@index([category])
+  @@index([status])
+  @@index([department])
+  @@map("equipment")
+}
+
+// =============================================================================
+// MAINTENANCE REQUESTS
+// =============================================================================
+
+// Request types
+enum RequestType {
+  CORRECTIVE  // Fix something that's broken
+  PREVENTIVE  // Scheduled maintenance to prevent issues
+}
+
+// Request status - strict state machine
+// New → In Progress → Repaired OR Scrap
+// Cannot skip states, cannot go backwards
+enum RequestStatus {
+  NEW         // Just created, awaiting assignment
+  IN_PROGRESS // Technician is working on it
+  REPAIRED    // Successfully fixed
+  SCRAP       // Equipment is beyond repair
+}
+
+// Priority levels
+enum RequestPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+// Maintenance Request model - core of the system
+model MaintenanceRequest {
+  id              String          @id @default(cuid())
+  title           String
+  description     String          @db.Text
+  type            RequestType
+  status          RequestStatus   @default(NEW)
+  priority        RequestPriority @default(MEDIUM)
+  
+  // Auto-filled from equipment selection
+  category        EquipmentCategory
+  
+  // Scheduling
+  scheduledDate   DateTime?       // When maintenance should occur
+  startedAt       DateTime?       // When work actually started
+  completedAt     DateTime?       // When work was completed
+  
+  // Duration tracking (required for closing repaired requests)
+  durationMinutes Int?            // Total repair time in minutes
+  
+  // Repair details
+  repairNotes     String?         @db.Text
+  partsUsed       String?         @db.Text
+  cost            Decimal?        @db.Decimal(10, 2)
+  
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  // Relations
+  equipmentId     String
+  equipment       Equipment       @relation(fields: [equipmentId], references: [id], onDelete: Restrict)
+  
+  // Creator of the request
+  createdById     String
+  createdBy       User            @relation("RequestCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  
+  // Assigned team (auto-filled from equipment)
+  teamId          String?
+  team            MaintenanceTeam? @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  
+  // Assigned technician (must be from the assigned team)
+  technicianId    String?
+  technician      User?           @relation("AssignedTechnician", fields: [technicianId], references: [id], onDelete: SetNull)
+  
+  // Activity logs
+  logs            RequestLog[]
+
+  @@index([status])
+  @@index([type])
+  @@index([priority])
+  @@index([scheduledDate])
+  @@index([equipmentId])
+  @@index([technicianId])
+  @@index([createdById])
+  @@map("maintenance_requests")
+}
+
+// =============================================================================
+// ACTIVITY LOGGING
+// =============================================================================
+
+// Log actions
+enum LogAction {
+  CREATED
+  STATUS_CHANGED
+  ASSIGNED
+  UNASSIGNED
+  UPDATED
+  COMMENTED
+}
+
+// Request activity log - tracks all changes
+model RequestLog {
+  id          String    @id @default(cuid())
+  action      LogAction
+  details     String?   @db.Text // JSON string with change details
+  createdAt   DateTime  @default(now())
+
+  // Relations
+  requestId   String
+  request     MaintenanceRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([requestId])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("request_logs")
+}
